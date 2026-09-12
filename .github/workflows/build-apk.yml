@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "Megan_Godot_REAL_GAME_Step1.zip"
+      - "- "Megan_Godot_REAL_GAME_Step1_FIXED.zip"
       - ".github/workflows/build-apk.yml"
 
 jobs:
@@ -21,8 +21,7 @@ jobs:
         run: |
           rm -rf godot_project
           mkdir godot_project
-          unzip -q Megan_Godot_REAL_GAME_Step1.zip -d godot_project
-
+          unzip -q Megan_Godot_REAL_GAME_Step1_FIXED.zip -d godot_project
       - name: Install Godot
         run: |
           wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
