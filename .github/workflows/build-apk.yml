@@ -33,7 +33,7 @@ jobs:
       - name: Unpack project
         run: |
           mkdir android
-          unzip Meganina_Carobna_Prica_Android_Project.zip -d android
+        unzip *.zip -d android
 
       - name: Build APK
         run: gradle -p android assembleDebug
