@@ -33,7 +33,7 @@ jobs:
       - name: Unpack project
         run: |
           mkdir android
-        unzip *.zip -d android
+          unzip *.zip -d android
 
       - name: Build APK
         run: gradle -p android assembleDebug
