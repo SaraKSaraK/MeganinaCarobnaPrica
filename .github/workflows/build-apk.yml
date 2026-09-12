@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "Megan_Godot_REAL_GAME_Step1_WORKING.zip"
+      - "Megan_Godot_PREMIUM_FOREST_0_2.zip"
       - ".github/workflows/build-apk.yml"
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
         run: |
           rm -rf godot_project
           mkdir -p godot_project
-          unzip -q Megan_Godot_REAL_GAME_Step1_WORKING.zip -d godot_project
+          unzip -q Megan_Godot_PREMIUM_FOREST_0_2.zip -d godot_project
           echo "Project contents:"
           find godot_project -maxdepth 3 -type f | sort
 
@@ -70,6 +70,8 @@ jobs:
       - name: Install Godot Android export templates
         run: |
           wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          rm -rf /tmp/godot_templates
+          mkdir -p /tmp/godot_templates
           mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
           unzip -q Godot_v4.3-stable_export_templates.tpz -d /tmp/godot_templates
           cp -a /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
