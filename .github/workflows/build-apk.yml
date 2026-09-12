@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "Megan_Godot_REAL_GAME_Step1_FIXED.zip"
+      - "Megan_Godot_REAL_GAME_Step1_WORKING.zip"
       - ".github/workflows/build-apk.yml"
 
 jobs:
@@ -21,26 +21,26 @@ jobs:
         run: |
           rm -rf godot_project
           mkdir -p godot_project
-          unzip -q Megan_Godot_REAL_GAME_Step1_FIXED.zip -d godot_project
+          unzip -q Megan_Godot_REAL_GAME_Step1_WORKING.zip -d godot_project
+          echo "Project contents:"
+          find godot_project -maxdepth 3 -type f | sort
 
-      - name: Install Godot 4.3
+      - name: Find Godot project directory
+        id: project
+        shell: bash
         run: |
-          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
-          unzip -q Godot_v4.3-stable_linux.x86_64.zip
-          chmod +x Godot_v4.3-stable_linux.x86_64
-          sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
-          godot --version
+          PROJECT_FILE="$(find godot_project -type f -name project.godot -print -quit)"
 
-      - name: Install Godot Android export templates
-        run: |
-          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
-          rm -rf /tmp/godot_templates
-          mkdir -p /tmp/godot_templates
-          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
-          unzip -q Godot_v4.3-stable_export_templates.tpz -d /tmp/godot_templates
-          cp -r /tmp/godot_templates/templates/* ~/.local/share/godot/export_templates/4.3.stable/
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "ERROR: project.godot was not found."
+            exit 1
+          fi
 
-      - name: Setup Java
+          PROJECT_DIR="$(dirname "$PROJECT_FILE")"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Godot project directory: $PROJECT_DIR"
+
+      - name: Install Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -54,87 +54,69 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager \
             "platform-tools" \
-            "build-tools;34.0.0" \
             "platforms;android-34" \
+            "build-tools;34.0.0" \
             "cmake;3.10.2.4988404" \
             "ndk;23.2.8568313"
 
-      - name: Create Android debug keystore
+      - name: Install Godot 4.3
         run: |
-          mkdir -p ~/.android
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q Godot_v4.3-stable_linux.x86_64.zip
+          chmod +x Godot_v4.3-stable_linux.x86_64
+          sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+          godot --version
 
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkeypair \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          ls -l ~/.android/debug.keystore
+      - name: Install Godot Android export templates
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          unzip -q Godot_v4.3-stable_export_templates.tpz -d /tmp/godot_templates
+          cp -a /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          ls -la "$HOME/.local/share/godot/export_templates/4.3.stable"
 
       - name: Configure Godot Android paths
         run: |
-          mkdir -p ~/.config/godot
-
-          cat > ~/.config/godot/editor_settings-4.tres <<EOF
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
           [resource]
           export/android/android_sdk_path = "$ANDROID_HOME"
-          export/android/java_sdk_path = "$JAVA_HOME"
-          export/android/debug_keystore = "/home/runner/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
+          export/android/java_sdk_path = "$JAVA_HOME_17_X64"
           EOF
 
-      - name: Check project files
-        run: |
-          echo "Project contents:"
-          find godot_project -maxdepth 3 -type f | sort
-
-          echo ""
-          echo "Export presets:"
-          cat godot_project/megan_godot_step1/export_presets.cfg
-
       - name: Import Godot project
-        working-directory: godot_project/megan_godot_step1
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        working-directory: ${{ steps.project.outputs.dir }}
         run: |
           godot --headless --editor --quit
 
-      - name: Start ADB
+      - name: Verify Android export preset
+        working-directory: ${{ steps.project.outputs.dir }}
         run: |
-          adb start-server || true
-          adb devices || true
+          if [ ! -f export_presets.cfg ]; then
+            echo "ERROR: export_presets.cfg is missing."
+            exit 1
+          fi
+
+          echo "Export presets:"
+          grep 'name=' export_presets.cfg || true
 
       - name: Build Android APK
-        working-directory: godot_project/megan_godot_step1
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        working-directory: ${{ steps.project.outputs.dir }}
         run: |
           mkdir -p build
+          godot --headless --export-debug "Android Debug" build/MeganMagicalAdventure.apk
 
-          godot \
-            --headless \
-            --verbose \
-            --export-debug "Android Debug" \
-            build/MeganMagicalAdventure-debug.apk
-
-          test -f build/MeganMagicalAdventure-debug.apk
+      - name: Verify APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          test -f build/MeganMagicalAdventure.apk
+          ls -lh build/MeganMagicalAdventure.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Megan-Magical-Adventure-APK
-          path: godot_project/megan_godot_step1/build/MeganMagicalAdventure-debug.apk
+          path: ${{ steps.project.outputs.dir }}/build/MeganMagicalAdventure.apk
           if-no-files-found: error
